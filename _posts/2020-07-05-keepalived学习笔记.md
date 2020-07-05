@@ -8,17 +8,21 @@ Keepalived软件的官方站点是http://www.keepalived.org。
 ### 12.1.2
 **1.管理LVS负载均衡软件**
 早期的LVS软件，需要通过命令行或脚本实现管理，并且没有针对LVS节点的健康检查功能。为了解决LVS的这些使用不便的问题，Keepalived就诞生了，可以说，Keepalived软件起初是专为解决LVS的问题而诞生的。因此，Keepalived和LVS的感情很深，它们的关系如同夫妻一样，可以紧密地结合，愉快地工作。Keepalived可以通过读取自身的配置文件，实现通过更底层的接口直接管理LVS的配置以及控制服务的启动、停止等功能，这使得LVS的应用更加简单方便了。LVS和Keepalived的组合应用不是本章的内容范围，此部分内容可以参考老男孩教育提供的Linux运维就业班视频或参考网上文章。
+
 **2.实现对LVS集群节点健康检查功能（healthcheck）**
 前文已讲过，Keepalived可以通过在自身的keepalived.conf文件里配置LVS的节点IP和相关参数实现对LVS的直接管理；除此之外，当LVS集群中的某一个甚至是几个节点服务器同时发生故障无法提供服务时，Keepalived服务会自动将失效的节点服务器从LVS的正常转发队列中清除出去，并将请求调度到别的正常节点服务器上，从而保证最终用户的访问不受影响；当故障的节点服务器被修复以后，Keepalived服务又会自动地把它们加入到正常转发队列中，对客户提供服务。
+
 **3.作为系统网络服务的高可用功能（failover）**
 Keepalived可以实现任意两台主机之间，例如Master和Backup主机之间的故障转移和自动切换，这个主机可以是普通的不能停机的业务服务器，也可以是LVS负载均衡、Nginx反向代理这样的服务器。
 Keepalived高可用功能实现的简单原理为，两台主机同时安装好Keepalived软件并启动服务，开始正常工作时，由角色为Master的主机获得所有资源并对用户提供服务，角色为Backup的主机作为Master主机的热备；当角色为Master的主机失效或出现故障时，角色为Backup的主机将自动接管Master主机的所有工作，包括接管VIP资源及相应资源服务；而当角色为Master的主机故障修复后，又会自动接管回它原来处理的工作，角色为Backup的主机则同时释放Master主机失效时它接管的工作，此时，两台主机将恢复到最初启动时各自的原始角色及工作状态。
+
 >说明：Keepalived的高可用功能是本章的重点，后面除了讲解Keepalived高可用的功能外，还会讲解Keepalived配合Nginx反向代理负载均衡的高可用的实战案例。
 
 
 ### 12.1.3 Keepalived高可用故障切换转移原理
 Keepalived高可用服务对之间的故障切换转移，是通过VRRP（Virtual Router Redundancy Protocol，虚拟路由器冗余协议）来实现的。
 在Keepalived服务正常工作时，主Master节点会不断地向备节点发送（多播的方式）心跳消息，用以告诉备Backup节点自己还活着，当主Master节点发生故障时，就无法发送心跳消息，备节点也就因此无法继续检测到来自主Master节点的心跳了，于是调用自身的接管程序，接管主Master节点的IP资源及服务。而当主Master节点恢复时，备Backup节点又会释放主节点故障时自身接管的IP资源及服务，恢复到原来的备用角色。
+
 那么，什么是VRRP呢？
 VRRP，全称`Virtual Router Redundancy Protocol`，中文名为虚拟路由冗余协议，VRRP的出现就是为了解决静态路由的单点故障问题，VRRP是通过一种竞选机制来将路由的任务交给某台VRRP路由器的。
 VRRP早期是用来解决交换机、路由器等设备单点故障的，下面是交换、路由的Master和Backup切换原理描述，同样适用于Keepalived的工作原理。
@@ -152,8 +156,8 @@ inet 192.168.200.18/32 scope global eth0
 ```
 >参数说明：
 第15行表示定义一个vrrp_instance实例，名字是VI_1，每个vrrp_instance实例可以认为是Keepalived服务的一个实例或者作为一个业务服务，在Keepalived服务配置中，这样的vrrp_instance实例可以有多个。注意，存在于主节点中的vrrp_instance实例在备节点中也要存在，这样才能实现故障切换接管。
-第16行state MASTER表示当前实例VI_1的角色状态，当前角色为MASTER，这个状态只能有MASTER和BACKUP两种状态，并且需要大写这些字符。其中MASTER为正式工作的状态，BACKUP为备用的状态。当MASTER所在的服务器故障或失效时，BACKUP所在的服务器会接管故障的MASTER继续提供服务。
-第17行interface为网络通信接口。为对外提供服务的网络接口，如eth0、eth1。当前主流的服务器都有2～4个网络接口，在选择服务接口时，要搞清楚了。
+>第16行state MASTER表示当前实例VI_1的角色状态，当前角色为MASTER，这个状态只能有MASTER和BACKUP两种状态，并且需要大写这些字符。其中MASTER为正式工作的状态，BACKUP为备用的状态。当MASTER所在的服务器故障或失效时，BACKUP所在的服务器会接管故障的MASTER继续提供服务。
+>第17行interface为网络通信接口。为对外提供服务的网络接口，如eth0、eth1。当前主流的服务器都有2～4个网络接口，在选择服务接口时，要搞清楚了。
 第18行virtual_router_id为虚拟路由ID标识，这个标识最好是一个数字，并且要在一个keepalived.conf配置中是唯一的。但是MASTER和BACKUP配置中相同实例的virtual_router_id又必须是一致的，否则将出现脑裂问题。
 第19行priority为优先级，其后面的数值也是一个数字，数字越大，表示实例优先级越高。在同一个vrrp_instance实例里，MASTER的优先级配置要高于BACKUP的。若MASTER的priority值为150，那么BACKUP的priority必须小于150，一般建议间隔50以上为佳，例如：设置BACKUP的priority为100或更小的数值。
 第20行advert_int为同步通知间隔。MASTER与BACKUP之间通信检查的时间间隔，单位为秒，默认为1。
@@ -279,6 +283,7 @@ ip addr | grep 192.168.154.130
 ### 12.3.2 单实例主备模式keepalived配置文件对比
 ![](https://tva1.sinaimg.cn/large/007S8ZIlly1ggg8xzp6yuj30rz0g6aal.jpg)
 表12-3为两台keepalived单实例MASTER和BACKUP节点的配置差别项，只有三项不同
+
 |keepalived配置参数|MASTER节点特殊参数|BACKUP特殊参数|
 |----|-----|-----|
 |router_id(唯一标识)|router_id lb01|router_id lb02|
