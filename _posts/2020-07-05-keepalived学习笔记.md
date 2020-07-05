@@ -279,6 +279,7 @@ ip addr | grep 192.168.154.130
 ### 12.3.2 单实例主备模式keepalived配置文件对比
 ![](https://tva1.sinaimg.cn/large/007S8ZIlly1ggg8xzp6yuj30rz0g6aal.jpg)
 表12-3为两台keepalived单实例MASTER和BACKUP节点的配置差别项，只有三项不同
+
 |keepalived配置参数|MASTER节点特殊参数|BACKUP特殊参数|
 |----|-----|-----|
 |router_id(唯一标识)|router_id lb01|router_id lb02|
